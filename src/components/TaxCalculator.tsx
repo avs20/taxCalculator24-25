@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Heart, Twitter, Linkedin } from 'lucide-react'; // Add these imports
+
 
 const TaxCalculator = () => {
   // ... [Previous state and constants remain the same] ...
@@ -167,6 +169,18 @@ const TaxCalculator = () => {
     }).format(amount);
   };
 
+  const Header = () => (
+    <div className="text-center space-y-2 mb-6">
+      <p className="text-xl italic text-gray-700">
+        "The hardest thing in the world to understand is income tax"
+        <span className="text-sm block">- Albert Einstein</span>
+      </p>
+      <p className="text-sm text-gray-500">
+        Disclaimer: This calculator is based on my best understanding of tax rules. Even Einstein couldn't understand taxes completely.
+      </p>
+    </div>
+  );
+
   const TaxSavingsCard = ({ oldTax, newTax }: { oldTax: number, newTax: number }) => {
     const savings = oldTax - newTax;
     const percentageSavings = ((savings / oldTax) * 100).toFixed(1);
@@ -292,9 +306,37 @@ const TaxBreakdown = ({ details, title, className }: TaxBreakdownProps) => {
   );
 };
   
+const Footer = () => (
+    <footer className="py-6 text-center text-sm text-gray-600 space-y-2">
+      <div className="flex items-center justify-center gap-1">
+        Built with <Heart className="h-4 w-4 text-red-500 fill-red-500" /> in Lucknow
+      </div>
+      <div className="flex items-center justify-center gap-4">
+        <a 
+          href="https://www.linkedin.com/in/captainashu/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+        >
+          <Linkedin className="h-4 w-4" />
+          Connect on LinkedIn
+        </a>
+        <a 
+          href="https://twitter.com/captAshutosh" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+        >
+          <Twitter className="h-4 w-4" />
+          @captAshutosh
+        </a>
+      </div>
+    </footer>
+  );
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
+        <Header />
       <Card>
         <CardHeader>
           <CardTitle>Income Tax Calculator (2024 vs 2025)</CardTitle>
@@ -335,6 +377,7 @@ const TaxBreakdown = ({ details, title, className }: TaxBreakdownProps) => {
           </div>
         </div>
       )}
+      <Footer />
     </div>
   );
 };
