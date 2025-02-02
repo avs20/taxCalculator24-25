@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { Heart, Twitter, Linkedin } from 'lucide-react'; // Add these imports
+import { Heart, Twitter, Linkedin, Youtube } from 'lucide-react'; // Add these imports
 
 
 const TaxCalculator = () => {
@@ -438,6 +438,15 @@ const Footer = () => (
         >
           <Twitter className="h-4 w-4" />
           @captAshutosh
+        </a>
+        <a 
+          href="https://youtube.com/playlist?list=PLLEDnsU5Fr10OQ7nzoxru3ZqoS78KeJlG&si=sUKs6NyHV34wWky9" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+        >
+          <Youtube className="h-4 w-4" />
+          Machine Learning from scratch
         </a>
       </div>
     </footer>
