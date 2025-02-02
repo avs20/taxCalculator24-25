@@ -26,8 +26,11 @@ const TaxCalculator = () => {
     totalTaxWithCess: number;
     rebateAmount: number;
     excessAboveRebateLimit: number;
+    surchargeAmount: number;
+    marginalRelief: number;
+    totalTaxWithSurcharge: number;
   }
-  
+
 
   interface TaxBreakdownProps {
     details: TaxCalculation;
@@ -50,6 +53,13 @@ const TaxCalculator = () => {
     max: number;
     rate: number;
   }
+
+  const SURCHARGE_SLABS = [
+    { min: 5000000, max: 10000000, rate: 0.10 },  // 50L to 1Cr
+    { min: 10000000, max: 20000000, rate: 0.15 }, // 1Cr to 2Cr
+    { min: 20000000, max: 50000000, rate: 0.25 }, // 2Cr to 5Cr
+    { min: 50000000, max: Infinity, rate: 0.37 }  // Above 5Cr
+  ];
 
   const oldTaxSlabs = [
     { min: 0, max: 300000, rate: 0 },
@@ -75,6 +85,74 @@ const TaxCalculator = () => {
   const OLD_REBATE_LIMIT = 700000;
   const NEW_REBATE_LIMIT = 1200000;
   const CESS_RATE = 0.04;
+
+  const calculateSurcharge = (taxBeforeCess: number, totalIncome: number) => {
+    if (totalIncome < 5000000) return 0; // No surcharge below 50L
+    
+    let surchargeRate = 0;
+    for (const slab of SURCHARGE_SLABS) {
+      if (totalIncome > slab.min) {
+        surchargeRate = slab.rate;
+      }
+    }
+    
+    return taxBeforeCess * surchargeRate;
+  };
+  
+
+  const calculateMarginalRelief = (taxBeforeCess: number, surcharge: number, totalIncome: number) => {
+    if (totalIncome <= 5000000) return 0;
+  
+    let relief = 0;
+    
+    // For income between 50L to 1Cr
+    if (totalIncome > 5000000 && totalIncome <= 10000000) {
+      const excess = totalIncome - 5000000;
+      const taxWithSurcharge = taxBeforeCess + surcharge;
+      const taxAt50L = (taxBeforeCess * 5000000) / totalIncome;
+      if (taxWithSurcharge - taxAt50L > excess) {
+        relief = taxWithSurcharge - taxAt50L - excess;
+      }
+    }
+    
+    // For income between 1Cr to 2Cr
+    else if (totalIncome > 10000000 && totalIncome <= 20000000) {
+      const excess = totalIncome - 10000000;
+      const taxWithSurcharge = taxBeforeCess + surcharge;
+      const taxAt1Cr = (taxBeforeCess * 10000000) / totalIncome;
+      const surchargeAt1Cr = taxAt1Cr * 0.10;
+      if (taxWithSurcharge - (taxAt1Cr + surchargeAt1Cr) > excess) {
+        relief = taxWithSurcharge - (taxAt1Cr + surchargeAt1Cr) - excess;
+      }
+    }
+    
+    // For income between 2Cr to 5Cr
+    else if (totalIncome > 20000000 && totalIncome <= 50000000) {
+      const excess = totalIncome - 20000000;
+      const taxWithSurcharge = taxBeforeCess + surcharge;
+      const taxAt2Cr = (taxBeforeCess * 20000000) / totalIncome;
+      const surchargeAt2Cr = taxAt2Cr * 0.15; // 15% surcharge at 2Cr
+      if (taxWithSurcharge - (taxAt2Cr + surchargeAt2Cr) > excess) {
+        relief = taxWithSurcharge - (taxAt2Cr + surchargeAt2Cr) - excess;
+      }
+    }
+    
+    // For income above 5Cr
+    else if (totalIncome > 50000000) {
+      const excess = totalIncome - 50000000;
+      const taxWithSurcharge = taxBeforeCess + surcharge;
+      const taxAt5Cr = (taxBeforeCess * 50000000) / totalIncome;
+      const surchargeAt5Cr = taxAt5Cr * 0.25; // 25% surcharge at 5Cr
+      if (taxWithSurcharge - (taxAt5Cr + surchargeAt5Cr) > excess) {
+        relief = taxWithSurcharge - (taxAt5Cr + surchargeAt5Cr) - excess;
+      }
+    }
+  
+    return relief;
+  };
+  
+  
+  
   
   const calculateTax = (income: number, slabs: TaxSlab[]) => {
     // Apply standard deduction first
@@ -129,6 +207,10 @@ const TaxCalculator = () => {
     // Apply cess
     const cessAmount = finalTax * CESS_RATE;
     const totalTaxWithCess = finalTax + cessAmount;
+    const surchargeAmount = calculateSurcharge(finalTax, income);
+    const marginalRelief = calculateMarginalRelief(finalTax, surchargeAmount, income);
+    const finalSurcharge = Math.max(0, surchargeAmount - marginalRelief);
+    const totalTaxWithSurcharge = finalTax + finalSurcharge + cessAmount;
   
     return {
       totalTax: finalTax,
@@ -141,7 +223,10 @@ const TaxCalculator = () => {
       basicExemption: slabs[0].max,
       standardDeduction,
       rebateAmount,
-      excessAboveRebateLimit
+      excessAboveRebateLimit,
+      surchargeAmount: finalSurcharge,
+      marginalRelief,
+      totalTaxWithSurcharge
     };
   };
   
@@ -216,95 +301,119 @@ const TaxCalculator = () => {
     );
   };
 
-const TaxBreakdown = ({ details, title, className }: TaxBreakdownProps) => {
-  const isNewRegime = title.includes("2025");
-  const rebateLimit = isNewRegime ? NEW_REBATE_LIMIT : OLD_REBATE_LIMIT;
-
-  return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-4">
-          <div className="p-4 bg-gray-50 rounded-lg space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Gross Income</span>
-              <span className="text-sm font-medium">{formatCurrency(Number(income))}</span>
+  const TaxBreakdown = ({ details, title, className }: TaxBreakdownProps) => {
+    const isNewRegime = title.includes("2025");
+    const rebateLimit = isNewRegime ? NEW_REBATE_LIMIT : OLD_REBATE_LIMIT;
+  
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-4">
+            {/* Income Calculation Section */}
+            <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Gross Income</span>
+                <span className="text-sm font-medium">{formatCurrency(Number(income))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Standard Deduction</span>
+                <span className="text-sm font-medium">- {formatCurrency(details.standardDeduction)}</span>
+              </div>
+              <div className="border-t border-gray-200 pt-2 flex justify-between">
+                <span className="text-sm font-semibold">Taxable Income</span>
+                <span className="text-sm font-semibold">{formatCurrency(details.taxableIncome)}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Standard Deduction</span>
-              <span className="text-sm font-medium">- {formatCurrency(details.standardDeduction)}</span>
-            </div>
-            <div className="border-t border-gray-200 pt-2 flex justify-between">
-              <span className="text-sm font-semibold">Taxable Income</span>
-              <span className="text-sm font-semibold">{formatCurrency(details.taxableIncome)}</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="font-medium">Tax Calculation</p>
+  
+            {/* Tax Calculation Section */}
             <div className="space-y-2">
-              {details.breakdown.map((item, index) => (
-                item.tax > 0 && (
-                  <div key={index} className="flex justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm">
-                      {item.slab} @ {item.rate}
-                    </span>
-                    <span className="text-sm font-medium">
-                      {formatCurrency(item.tax)}
-                    </span>
+              <p className="font-medium">Tax Calculation</p>
+              <div className="space-y-2">
+                {details.breakdown.map((item, index) => (
+                  item.tax > 0 && (
+                    <div key={index} className="flex justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm">
+                        {item.slab} @ {item.rate}
+                      </span>
+                      <span className="text-sm font-medium">
+                        {formatCurrency(item.tax)}
+                      </span>
+                    </div>
+                  )
+                ))}
+                
+                <div className="border-t border-gray-200 mt-2 pt-2">
+                  {/* Initial Tax Calculation */}
+                  {details.rebateAmount > 0 && (
+                    <>
+                      <div className="flex justify-between p-2">
+                        <span className="text-sm">Initial Tax</span>
+                        <span className="text-sm">{formatCurrency(details.totalTax + details.rebateAmount)}</span>
+                      </div>
+                      <div className="flex justify-between p-2 text-green-600">
+                        <span className="text-sm">Tax Rebate</span>
+                        <span className="text-sm">- {formatCurrency(details.rebateAmount)}</span>
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Tax before Surcharge */}
+                  <div className="flex justify-between p-2">
+                    <span className="text-sm">Tax before Surcharge</span>
+                    <span className="text-sm">{formatCurrency(details.totalTax)}</span>
                   </div>
-                )
-              ))}
-              
-              <div className="border-t border-gray-200 mt-2 pt-2">
-                {details.rebateAmount > 0 && (
-                  <>
-                    <div className="flex justify-between p-2">
-                      <span className="text-sm">Initial Tax</span>
-                      <span className="text-sm">{formatCurrency(details.totalTax + details.rebateAmount)}</span>
-                    </div>
-                    <div className="flex justify-between p-2 text-green-600">
-                      <span className="text-sm">Tax Rebate</span>
-                      <span className="text-sm">- {formatCurrency(details.rebateAmount)}</span>
-                    </div>
-                  </>
-                )}
-                
-                <div className="flex justify-between p-2">
-                  <span className="text-sm">Tax before Cess</span>
-                  <span className="text-sm">{formatCurrency(details.totalTax)}</span>
-                </div>
-                
-                <div className="flex justify-between p-2">
-                  <span className="text-sm">Health & Education Cess @ 4%</span>
-                  <span className="text-sm">{formatCurrency(details.cessAmount)}</span>
-                </div>
-
-                <div className="flex justify-between p-2 bg-gray-100 font-semibold rounded mt-2">
-                  <span>Final Tax</span>
-                  <span>{formatCurrency(details.totalTaxWithCess)}</span>
+  
+                  {/* Surcharge Section - Only show if applicable */}
+                  {details.surchargeAmount > 0 && (
+                    <>
+                      <div className="flex justify-between p-2">
+                        <span className="text-sm">Surcharge</span>
+                        <span className="text-sm">{formatCurrency(details.surchargeAmount)}</span>
+                      </div>
+                      {details.marginalRelief > 0 && (
+                        <div className="flex justify-between p-2 text-green-600">
+                          <span className="text-sm">Marginal Relief</span>
+                          <span className="text-sm">- {formatCurrency(details.marginalRelief)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Cess Calculation */}
+                  <div className="flex justify-between p-2">
+                    <span className="text-sm">Health & Education Cess @ 4%</span>
+                    <span className="text-sm">{formatCurrency(details.cessAmount)}</span>
+                  </div>
+  
+                  {/* Final Tax Amount */}
+                  <div className="flex justify-between p-2 bg-gray-100 font-semibold rounded mt-2">
+                    <span>Final Tax</span>
+                    <span>{formatCurrency(details.totalTaxWithSurcharge)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">Take Home</p>
-              <p className="text-lg font-semibold">{formatCurrency(details.takeHome)}</p>
+  
+            {/* Summary Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Take Home</p>
+                <p className="text-lg font-semibold">{formatCurrency(details.takeHome)}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Effective Tax Rate</p>
+                <p className="text-lg font-semibold">{details.effectiveRate}%</p>
+              </div>
             </div>
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">Effective Tax Rate</p>
-              <p className="text-lg font-semibold">{details.effectiveRate}%</p>
-            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
+        </CardContent>
+      </Card>
+    );
+  };
+  
   
 const Footer = () => (
     <footer className="py-6 text-center text-sm text-gray-600 space-y-2">
