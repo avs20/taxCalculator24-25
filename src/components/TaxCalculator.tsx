@@ -80,7 +80,7 @@ const TaxCalculator = () => {
     { min: 2400000, max: Infinity, rate: 0.30 }
   ];
 
-  const OLD_STANDARD_DEDUCTION = 50000;
+  const OLD_STANDARD_DEDUCTION = 75000;
   const NEW_STANDARD_DEDUCTION = 75000;
   const OLD_REBATE_LIMIT = 700000;
   const NEW_REBATE_LIMIT = 1200000;
